@@ -22,10 +22,10 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 // UnmarshalCaddyfile configures the global directive from Caddyfile.
 // Syntax:
 //
-//   awslambda [<matcher>] {
-//       function <function name>
-//       timeout  <duration>
-//   }
+//	awslambda [<matcher>] {
+//	    function <function name>
+//	    timeout  <duration>
+//	}
 func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		if d.NextArg() {
