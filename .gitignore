@@ -1,2 +1,3 @@
 caddy
 buildenv_*
+.aws-sam/
