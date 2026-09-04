@@ -58,6 +58,17 @@ Use the qualified function or alias ARN as `Resource` when invocation is
 restricted to a specific version or alias. If `role_arn` is configured, the
 workload role also needs `sts:AssumeRole` permission for that target role.
 
+For cross-account access, choose one of these patterns:
+
+- Direct invocation: add the Caddy workload role as a principal in the Lambda
+  function's resource-based policy, and grant the workload role
+  `lambda:InvokeFunction` on that function.
+- Assumed role: grant the workload role `sts:AssumeRole` on the target role,
+  trust the workload role in the target role's trust policy, and grant the
+  target role `lambda:InvokeFunction` on the function. In this pattern, the
+  Lambda resource policy is not required because the assumed role belongs to
+  the target account.
+
 ## Event formats
 
 The `event_format` setting selects both the request event and response format.
