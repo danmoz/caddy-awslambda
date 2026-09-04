@@ -99,7 +99,16 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 
 // Validate implements caddy.Validator.
 func (m *LambdaMiddleware) Validate() error {
-	return nil
+	if m.FunctionName == "" {
+		return errors.New("function must be configured")
+	}
+
+	switch m.eventFormat() {
+	case eventFormatHTTPJSON, eventFormatAPIGatewayV2:
+		return nil
+	default:
+		return fmt.Errorf("unsupported event format %q", m.EventFormat)
+	}
 }
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.

@@ -61,3 +61,41 @@ func TestInvokeLambdaReturnsFunctionError(t *testing.T) {
 		t.Fatal("invokeLambda() error = nil, want function error")
 	}
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name          string
+		middleware    LambdaMiddleware
+		wantErrorText string
+	}{
+		{name: "missing function", wantErrorText: "function must be configured"},
+		{
+			name:          "unknown event format",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", EventFormat: "unknown"},
+			wantErrorText: "unsupported event format \"unknown\"",
+		},
+		{
+			name:       "default event format",
+			middleware: LambdaMiddleware{FunctionName: "test-function"},
+		},
+		{
+			name:       "api gateway v2",
+			middleware: LambdaMiddleware{FunctionName: "test-function", EventFormat: eventFormatAPIGatewayV2},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.middleware.Validate()
+			if test.wantErrorText == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != test.wantErrorText {
+				t.Fatalf("Validate() error = %v, want %q", err, test.wantErrorText)
+			}
+		})
+	}
+}
