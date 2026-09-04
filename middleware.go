@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
@@ -43,6 +46,9 @@ type LambdaMiddleware struct {
 	EventFormat     string `json:"event_format,omitempty"`
 	Timeout         string `json:"timeout,omitempty"`
 	MaxBodySize     int64  `json:"max_body_size,omitempty"`
+	RoleARN         string `json:"role_arn,omitempty"`
+	ExternalID      string `json:"external_id,omitempty"`
+	SessionName     string `json:"session_name,omitempty"`
 
 	timeout time.Duration
 	log     *zap.Logger
@@ -87,6 +93,17 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to load AWS config: %w", err)
 	}
+	if m.RoleARN != "" {
+		provider := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(cfg), m.RoleARN, func(options *stscreds.AssumeRoleOptions) {
+			if m.ExternalID != "" {
+				options.ExternalID = aws.String(m.ExternalID)
+			}
+			if m.SessionName != "" {
+				options.RoleSessionName = m.SessionName
+			}
+		})
+		cfg.Credentials = aws.NewCredentialsCache(provider)
+	}
 
 	if m.Endpoint == "" {
 		m.svc = lambda.NewFromConfig(cfg)
@@ -100,6 +117,9 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 
 // Validate implements caddy.Validator.
 func (m *LambdaMiddleware) Validate() error {
+	if m.RoleARN == "" && (m.ExternalID != "" || m.SessionName != "") {
+		return errors.New("external_id and session_name require role_arn")
+	}
 	if m.MaxBodySize < 0 {
 		return errors.New("max_body_size must not be negative")
 	}

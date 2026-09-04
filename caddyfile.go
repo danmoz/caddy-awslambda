@@ -33,6 +33,9 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    session_token <session token>
 //	    timeout  <duration>
 //	    max_body_size <bytes>
+//	    role_arn <role ARN>
+//	    external_id <external ID>
+//	    session_name <session name>
 //	}
 func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
@@ -117,6 +120,30 @@ func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("invalid max_body_size: %v", err)
 				}
 				m.MaxBodySize = size
+			case "role_arn":
+				if m.RoleARN != "" {
+					return d.Err("role_arn already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.RoleARN = d.Val()
+			case "external_id":
+				if m.ExternalID != "" {
+					return d.Err("external_id already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.ExternalID = d.Val()
+			case "session_name":
+				if m.SessionName != "" {
+					return d.Err("session_name already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.SessionName = d.Val()
 			default:
 				return d.Errf("unrecognized subdirective: %s", d.Val())
 			}

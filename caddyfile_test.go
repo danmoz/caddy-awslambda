@@ -18,6 +18,9 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 			session_token token
 			timeout 5s
 			max_body_size 1024
+			role_arn arn:aws:iam::123456789012:role/test
+			external_id external-test
+			session_name caddy-test
 		}
 	`)); err != nil {
 		t.Fatalf("UnmarshalCaddyfile() error = %v", err)
@@ -40,5 +43,8 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 	}
 	if m.MaxBodySize != 1024 {
 		t.Errorf("MaxBodySize = %d, want 1024", m.MaxBodySize)
+	}
+	if m.RoleARN != "arn:aws:iam::123456789012:role/test" || m.ExternalID != "external-test" || m.SessionName != "caddy-test" {
+		t.Errorf("role settings = %q/%q/%q", m.RoleARN, m.ExternalID, m.SessionName)
 	}
 }

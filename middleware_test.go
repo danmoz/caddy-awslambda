@@ -89,6 +89,11 @@ func TestValidate(t *testing.T) {
 			middleware:    LambdaMiddleware{FunctionName: "test-function", MaxBodySize: -1},
 			wantErrorText: "max_body_size must not be negative",
 		},
+		{
+			name:          "role options require role",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", ExternalID: "external-test"},
+			wantErrorText: "external_id and session_name require role_arn",
+		},
 	}
 
 	for _, test := range tests {
