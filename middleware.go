@@ -10,11 +10,16 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
 )
+
+type lambdaInvoker interface {
+	Invoke(context.Context, *lambda.InvokeInput, ...func(*lambda.Options)) (*lambda.InvokeOutput, error)
+}
 
 var (
 	_ caddy.Module                = (*LambdaMiddleware)(nil)
@@ -29,14 +34,18 @@ func init() {
 
 // LambdaMiddleware implements an HTTP handler that invokes a Lambda function.
 type LambdaMiddleware struct {
-	FunctionName string `json:"function,omitempty"`
-	Endpoint     string `json:"endpoint,omitempty"`
-	EventFormat  string `json:"event_format,omitempty"`
-	Timeout      string `json:"timeout,omitempty"`
+	FunctionName    string `json:"function,omitempty"`
+	Endpoint        string `json:"endpoint,omitempty"`
+	Region          string `json:"region,omitempty"`
+	AccessKeyID     string `json:"access_key_id,omitempty"`
+	SecretAccessKey string `json:"secret_access_key,omitempty"`
+	SessionToken    string `json:"session_token,omitempty"`
+	EventFormat     string `json:"event_format,omitempty"`
+	Timeout         string `json:"timeout,omitempty"`
 
 	timeout time.Duration
 	log     *zap.Logger
-	svc     *lambda.Client
+	svc     lambdaInvoker
 }
 
 // CaddyModule returns the Caddy module information.
@@ -61,7 +70,19 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 	}
 	m.timeout = dur
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	if (m.AccessKeyID == "") != (m.SecretAccessKey == "") {
+		return errors.New("access_key_id and secret_access_key must be configured together")
+	}
+	configOptions := []func(*config.LoadOptions) error{}
+	if m.Region != "" {
+		configOptions = append(configOptions, config.WithRegion(m.Region))
+	}
+	if m.AccessKeyID != "" {
+		configOptions = append(configOptions, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			m.AccessKeyID, m.SecretAccessKey, m.SessionToken,
+		)))
+	}
+	cfg, err := config.LoadDefaultConfig(ctx, configOptions...)
 	if err != nil {
 		return fmt.Errorf("unable to load AWS config: %w", err)
 	}
@@ -73,7 +94,6 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 			options.BaseEndpoint = &m.Endpoint
 		})
 	}
-
 	return nil
 }
 

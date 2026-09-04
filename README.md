@@ -32,6 +32,9 @@ http://localhost:8080 {
 The `endpoint` setting is optional. When omitted, the AWS SDK resolves the
 standard Lambda endpoint. For local SAM testing, set it to the address used by
 `sam local start-lambda`, for example `http://127.0.0.1:3001`.
+`region` overrides the AWS region, and `access_key_id`, `secret_access_key`,
+and `session_token` can provide local-only credentials for SAM. When these
+settings are omitted, the AWS SDK default credential chain is used.
 
 ## Event formats
 
@@ -63,13 +66,13 @@ handler errors and are not silently converted to successful responses.
 
 ## Development
 
-You can lint and format code with mise commands:
+Use mise commands to lint, format, and test the code.
 
 ```
-mise format
 mise lint
-mise format --check
-mise lint --check
+mise format
+mise test
+mise e2e
 ```
 
 ## License
