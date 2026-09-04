@@ -94,6 +94,21 @@ func TestValidate(t *testing.T) {
 			middleware:    LambdaMiddleware{FunctionName: "test-function", ExternalID: "external-test"},
 			wantErrorText: "external_id and session_name require role_arn",
 		},
+		{
+			name:          "invalid timeout",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", Timeout: "not-a-duration"},
+			wantErrorText: "invalid value for timeout: time: invalid duration \"not-a-duration\"",
+		},
+		{
+			name:          "non-positive timeout",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", Timeout: "0s"},
+			wantErrorText: "timeout must be greater than zero",
+		},
+		{
+			name:          "missing secret key",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", AccessKeyID: "access"},
+			wantErrorText: "access_key_id and secret_access_key must be configured together",
+		},
 	}
 
 	for _, test := range tests {

@@ -77,9 +77,6 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 	}
 	m.timeout = dur
 
-	if (m.AccessKeyID == "") != (m.SecretAccessKey == "") {
-		return errors.New("access_key_id and secret_access_key must be configured together")
-	}
 	configOptions := []func(*config.LoadOptions) error{}
 	if m.Region != "" {
 		configOptions = append(configOptions, config.WithRegion(m.Region))
@@ -117,6 +114,18 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 
 // Validate implements caddy.Validator.
 func (m *LambdaMiddleware) Validate() error {
+	if m.Timeout != "" {
+		dur, err := time.ParseDuration(m.Timeout)
+		if err != nil {
+			return fmt.Errorf("invalid value for timeout: %w", err)
+		}
+		if dur <= 0 {
+			return errors.New("timeout must be greater than zero")
+		}
+	}
+	if (m.AccessKeyID == "") != (m.SecretAccessKey == "") {
+		return errors.New("access_key_id and secret_access_key must be configured together")
+	}
 	if m.RoleARN == "" && (m.ExternalID != "" || m.SessionName != "") {
 		return errors.New("external_id and session_name require role_arn")
 	}
