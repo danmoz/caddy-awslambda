@@ -48,3 +48,18 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 		t.Errorf("role settings = %q/%q/%q", m.RoleARN, m.ExternalID, m.SessionName)
 	}
 }
+
+func TestUnmarshalCaddyfileAllowsMatcher(t *testing.T) {
+	m := &LambdaMiddleware{}
+	err := m.UnmarshalCaddyfile(caddyfile.NewTestDispenser(`
+		awslambda /services/* {
+			function test-function
+		}
+	`))
+	if err != nil {
+		t.Fatalf("UnmarshalCaddyfile() error = %v", err)
+	}
+	if m.FunctionName != "test-function" {
+		t.Errorf("FunctionName = %q, want %q", m.FunctionName, "test-function")
+	}
+}

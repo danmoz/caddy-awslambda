@@ -39,9 +39,6 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	}
 func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
-		if d.NextArg() {
-			return d.ArgErr()
-		}
 		for d.NextBlock(0) {
 			switch d.Val() {
 			case "function":
