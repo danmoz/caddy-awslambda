@@ -20,24 +20,37 @@ run = [
 
 [tasks.format]
 description = "Format Go and Python code"
-run = [
-  "gofmt -w $(find . -name '*.go' -type f -print)",
-  "ruff format testdata/lambda",
-]
+usage = 'flag "--check" help="Fail instead of formatting code"'
+run = '''
+go_files=$(find . -name '*.go' -type f -print)
+
+{% if usage.check %}
+test -z "$(gofmt -l $go_files)"
+ruff format --diff testdata/lambda
+{% else %}
+  gofmt -w $go_files
+  ruff format testdata/lambda
+{% endif %}
+'''
 
 [tasks.lint]
 description = "Lint Go and Python code"
 usage = 'flag "--check" help="Fail instead of formatting code"'
 run = '''
 go_files=$(find . -name '*.go' -type f -print)
+
 {% if usage.check %}
   test -z "$(gofmt -l $go_files)"
-  ruff format --check testdata/lambda
 {% else %}
   gofmt -w $go_files
-  ruff format testdata/lambda
 {% endif %}
-ruff check testdata/lambda
+
+{% if usage.check %}
+  ruff check testdata/lambda
+{% else %}
+  ruff check --fix testdata/lambda
+{% endif %}
+
 go vet ./...
 '''
 

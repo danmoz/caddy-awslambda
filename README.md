@@ -68,6 +68,8 @@ You can lint and format code with mise commands:
 ```
 mise format
 mise lint
+mise format --check
+mise lint --check
 ```
 
 ## License
