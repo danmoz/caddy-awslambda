@@ -24,9 +24,14 @@ http://localhost:8080 {
   }
   awslambda /services/* {
     function ForwardToSlack
+    # endpoint http://127.0.0.1:3001
   }
 }
 ```
+
+The `endpoint` setting is optional. When omitted, the AWS SDK resolves the
+standard Lambda endpoint. For local SAM testing, set it to the address used by
+`sam local start-lambda`, for example `http://127.0.0.1:3001`.
 
 ## License
 

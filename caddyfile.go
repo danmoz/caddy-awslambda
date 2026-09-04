@@ -24,6 +24,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //
 //	awslambda [<matcher>] {
 //	    function <function name>
+//	    endpoint <url>
 //	    timeout  <duration>
 //	}
 func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -41,6 +42,14 @@ func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.FunctionName = d.Val()
+			case "endpoint":
+				if m.Endpoint != "" {
+					return d.Err("endpoint already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.Endpoint = d.Val()
 			case "timeout":
 				if !d.NextArg() {
 					return d.ArgErr()
