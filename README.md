@@ -36,6 +36,28 @@ standard Lambda endpoint. For local SAM testing, set it to the address used by
 and `session_token` can provide local-only credentials for SAM. When these
 settings are omitted, the AWS SDK default credential chain is used.
 
+## IAM permissions
+
+Caddy invokes Lambda with SigV4 using its workload IAM role. Grant that role
+only permission to invoke the target function or alias:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ForwardToSlack"
+    }
+  ]
+}
+```
+
+Use the qualified function or alias ARN as `Resource` when invocation is
+restricted to a specific version or alias. If `role_arn` is configured, the
+workload role also needs `sts:AssumeRole` permission for that target role.
+
 ## Event formats
 
 The `event_format` setting selects both the request event and response format.
