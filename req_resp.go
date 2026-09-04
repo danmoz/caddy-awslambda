@@ -92,7 +92,6 @@ func newRequestForFormat(r *http.Request, format string, maxBodySize int64) (any
 }
 
 func readRequestBody(r *http.Request, maxBodySize int64) ([]byte, error) {
-	defer r.Body.Close()
 	if maxBodySize > 0 {
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 		if err == nil && int64(len(body)) > maxBodySize {

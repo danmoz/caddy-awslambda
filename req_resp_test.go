@@ -2,6 +2,7 @@ package caddyawslambda
 
 import (
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,4 +83,26 @@ func TestNewRequestForFormatRejectsOversizedBody(t *testing.T) {
 	if got := err.Error(); !strings.Contains(got, "request body exceeds maximum size of 4 bytes") {
 		t.Fatalf("error = %q, want body size error", got)
 	}
+}
+
+func TestReadRequestBodyDoesNotCloseBody(t *testing.T) {
+	body := &trackingBody{Reader: strings.NewReader("body")}
+	r := httptest.NewRequest(http.MethodPost, "/", body)
+
+	if _, err := readRequestBody(r, 0); err != nil {
+		t.Fatalf("readRequestBody() error = %v", err)
+	}
+	if body.closed {
+		t.Fatal("readRequestBody() closed the request body")
+	}
+}
+
+type trackingBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *trackingBody) Close() error {
+	b.closed = true
+	return nil
 }
