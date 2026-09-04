@@ -2,7 +2,7 @@ package caddyawslambda
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -21,7 +21,7 @@ func parseReply(data []byte) (*Reply, error) {
 		err := json.Unmarshal(data, &rep)
 		if err == nil && rep.Type == "HTTPJSON-REP" {
 			if rep.Meta == nil {
-				rep.Meta = &defaultMeta
+				rep.Meta = defaultReplyMeta()
 			}
 			return &rep, nil
 		}
@@ -29,7 +29,7 @@ func parseReply(data []byte) (*Reply, error) {
 
 	return &Reply{
 		Type: "HTTPJSON-REP",
-		Meta: &defaultMeta,
+		Meta: defaultReplyMeta(),
 		Body: string(data),
 	}, nil
 }
@@ -38,7 +38,7 @@ func parseReply(data []byte) (*Reply, error) {
 // Returns an error if the HTTP request body cannot be read.
 func newRequest(r *http.Request) (*Request, error) {
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}

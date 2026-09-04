@@ -73,7 +73,14 @@ func TestCaddyProcess(t *testing.T) {
 	for time.Now().Before(deadline) {
 		response, err := client.Get(url)
 		if err == nil {
-			response.Body.Close()
+			_, readErr := io.Copy(io.Discard, response.Body)
+			closeErr := response.Body.Close()
+			if readErr != nil {
+				t.Fatalf("read health response: %v", readErr)
+			}
+			if closeErr != nil {
+				t.Fatalf("close health response: %v", closeErr)
+			}
 			if response.StatusCode != http.StatusOK {
 				t.Fatalf("unexpected health status: %d", response.StatusCode)
 			}

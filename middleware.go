@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -21,20 +21,13 @@ var (
 	_ caddy.Provisioner           = (*LambdaMiddleware)(nil)
 	_ caddy.Validator             = (*LambdaMiddleware)(nil)
 	_ caddyhttp.MiddlewareHandler = (*LambdaMiddleware)(nil)
-
-	defaultMeta = ReplyMeta{
-		Status: 200,
-		Headers: map[string][]string{
-			"content-type": {"application/json"},
-		},
-	}
 )
 
 func init() {
 	caddy.RegisterModule(&LambdaMiddleware{})
 }
 
-// LambdaMiddleware implements an HTTP handler that invokes a lambda function
+// LambdaMiddleware implements an HTTP handler that invokes a Lambda function.
 type LambdaMiddleware struct {
 	FunctionName string `json:"function,omitempty"`
 	Timeout      string `json:"timeout,omitempty"`
@@ -62,13 +55,13 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 
 	dur, err := time.ParseDuration(m.Timeout)
 	if err != nil {
-		return fmt.Errorf("Invalid value for timeout: %w", err)
+		return fmt.Errorf("invalid value for timeout: %w", err)
 	}
 	m.timeout = dur
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("Unable to load AWS config: %w", err)
+		return fmt.Errorf("unable to load AWS config: %w", err)
 	}
 
 	m.svc = lambda.NewFromConfig(cfg)
@@ -76,13 +69,13 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-// Validate implements caddy.Validator
+// Validate implements caddy.Validator.
 func (m *LambdaMiddleware) Validate() error {
 	return nil
 }
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
-func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ caddyhttp.Handler) error {
 	req, err := newRequest(r)
 	if err != nil {
 		return err
@@ -161,7 +154,7 @@ func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req *Request) ([]by
 	}
 
 	if resp.FunctionError != nil {
-		err = fmt.Errorf("Function error: %s: %w", *resp.FunctionError, errors.New(string(resp.Payload)))
+		err = fmt.Errorf("function error: %s: %w", *resp.FunctionError, errors.New(string(resp.Payload)))
 		log.Error("", zap.Error(err))
 		return nil, err
 	}
@@ -170,8 +163,15 @@ func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req *Request) ([]by
 	return resp.Payload, nil
 }
 
-// Cleanup implements caddy.Cleanup
+// Cleanup implements caddy.Cleanup.
 // TODO: ensure all running processes are terminated.
 func (m *LambdaMiddleware) Cleanup() error {
 	return nil
+}
+
+func defaultReplyMeta() *ReplyMeta {
+	return &ReplyMeta{
+		Status:  http.StatusOK,
+		Headers: map[string][]string{"content-type": {"application/json"}},
+	}
 }
