@@ -9,12 +9,38 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
 
 func TestCaddyProcess(t *testing.T) {
 	root := repositoryRoot(t)
+	sam, err := exec.LookPath("sam")
+	if err != nil {
+		t.Skip("SAM CLI is required for the E2E test")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	samPort := freePort(t)
+	samProcess := exec.CommandContext(ctx, sam, "local", "start-lambda",
+		"--template", filepath.Join(root, "testdata", "template.yaml"),
+		"--host", "127.0.0.1",
+		"--port", strconv.Itoa(samPort),
+	)
+	samProcess.Stdout = io.Discard
+	samProcess.Stderr = io.Discard
+	if err := samProcess.Start(); err != nil {
+		t.Fatalf("start SAM local Lambda: %v", err)
+	}
+	defer func() {
+		cancel()
+		_ = samProcess.Wait()
+	}()
+	waitForPort(t, fmt.Sprintf("127.0.0.1:%d", samPort))
+
 	binary := filepath.Join(t.TempDir(), "caddy")
 
 	build := exec.Command("go", "build", "-o", binary, "./test/e2e/caddy")
@@ -30,8 +56,6 @@ func TestCaddyProcess(t *testing.T) {
 		t.Fatalf("write Caddyfile: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	process := exec.CommandContext(ctx, binary, "run", "--config", config)
 	process.Stdout = io.Discard
 	process.Stderr = io.Discard
@@ -78,4 +102,20 @@ func freePort(t *testing.T) int {
 	}
 	defer listener.Close()
 	return listener.Addr().(*net.TCPAddr).Port
+}
+
+func waitForPort(t *testing.T, address string) {
+	t.Helper()
+	client := &net.Dialer{Timeout: 100 * time.Millisecond}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		connection, err := client.Dial("tcp", address)
+		if err == nil {
+			connection.Close()
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	t.Fatalf("process did not listen at %s", address)
 }
