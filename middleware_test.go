@@ -82,6 +82,11 @@ func TestValidate(t *testing.T) {
 			name:       "api gateway v2",
 			middleware: LambdaMiddleware{FunctionName: "test-function", EventFormat: eventFormatAPIGatewayV2},
 		},
+		{
+			name:          "negative max body size",
+			middleware:    LambdaMiddleware{FunctionName: "test-function", MaxBodySize: -1},
+			wantErrorText: "max_body_size must not be negative",
+		},
 	}
 
 	for _, test := range tests {

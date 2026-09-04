@@ -17,6 +17,7 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 			secret_access_key secret
 			session_token token
 			timeout 5s
+			max_body_size 1024
 		}
 	`)); err != nil {
 		t.Fatalf("UnmarshalCaddyfile() error = %v", err)
@@ -36,5 +37,8 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 	}
 	if m.Timeout != "5s" {
 		t.Errorf("Timeout = %q, want %q", m.Timeout, "5s")
+	}
+	if m.MaxBodySize != 1024 {
+		t.Errorf("MaxBodySize = %d, want 1024", m.MaxBodySize)
 	}
 }

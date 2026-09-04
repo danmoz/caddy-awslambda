@@ -42,6 +42,7 @@ type LambdaMiddleware struct {
 	SessionToken    string `json:"session_token,omitempty"`
 	EventFormat     string `json:"event_format,omitempty"`
 	Timeout         string `json:"timeout,omitempty"`
+	MaxBodySize     int64  `json:"max_body_size,omitempty"`
 
 	timeout time.Duration
 	log     *zap.Logger
@@ -99,6 +100,9 @@ func (m *LambdaMiddleware) Provision(ctx caddy.Context) error {
 
 // Validate implements caddy.Validator.
 func (m *LambdaMiddleware) Validate() error {
+	if m.MaxBodySize < 0 {
+		return errors.New("max_body_size must not be negative")
+	}
 	if m.FunctionName == "" {
 		return errors.New("function must be configured")
 	}
@@ -113,7 +117,7 @@ func (m *LambdaMiddleware) Validate() error {
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ caddyhttp.Handler) error {
-	req, err := newRequestForFormat(r, m.eventFormat())
+	req, err := newRequestForFormat(r, m.eventFormat(), m.MaxBodySize)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,8 @@
 package caddyawslambda
 
 import (
+	"strconv"
+
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
@@ -30,6 +32,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    secret_access_key <secret access key>
 //	    session_token <session token>
 //	    timeout  <duration>
+//	    max_body_size <bytes>
 //	}
 func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
@@ -102,6 +105,18 @@ func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.EventFormat = d.Val()
+			case "max_body_size":
+				if m.MaxBodySize != 0 {
+					return d.Err("max_body_size already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				size, err := strconv.ParseInt(d.Val(), 10, 64)
+				if err != nil {
+					return d.Errf("invalid max_body_size: %v", err)
+				}
+				m.MaxBodySize = size
 			default:
 				return d.Errf("unrecognized subdirective: %s", d.Val())
 			}

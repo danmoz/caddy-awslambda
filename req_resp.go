@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 const (
@@ -73,8 +75,8 @@ func boolEncoding(encoded bool) string {
 	return ""
 }
 
-func newRequestForFormat(r *http.Request, format string) (any, error) {
-	body, err := readRequestBody(r)
+func newRequestForFormat(r *http.Request, format string, maxBodySize int64) (any, error) {
+	body, err := readRequestBody(r, maxBodySize)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +91,16 @@ func newRequestForFormat(r *http.Request, format string) (any, error) {
 	}
 }
 
-func readRequestBody(r *http.Request) ([]byte, error) {
+func readRequestBody(r *http.Request, maxBodySize int64) ([]byte, error) {
 	defer r.Body.Close()
+	if maxBodySize > 0 {
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
+		if err == nil && int64(len(body)) > maxBodySize {
+			return nil, caddyhttp.Error(http.StatusRequestEntityTooLarge,
+				fmt.Errorf("request body exceeds maximum size of %d bytes", maxBodySize))
+		}
+		return body, err
+	}
 	return io.ReadAll(r.Body)
 }
 
