@@ -3,6 +3,7 @@ package caddyawslambda
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,10 +17,14 @@ type fakeLambdaInvoker struct {
 	input  *lambda.InvokeInput
 	output *lambda.InvokeOutput
 	err    error
+	invoke func(context.Context, *lambda.InvokeInput) (*lambda.InvokeOutput, error)
 }
 
-func (f *fakeLambdaInvoker) Invoke(_ context.Context, input *lambda.InvokeInput, _ ...func(*lambda.Options)) (*lambda.InvokeOutput, error) {
+func (f *fakeLambdaInvoker) Invoke(ctx context.Context, input *lambda.InvokeInput, _ ...func(*lambda.Options)) (*lambda.InvokeOutput, error) {
 	f.input = input
+	if f.invoke != nil {
+		return f.invoke(ctx, input)
+	}
 	return f.output, f.err
 }
 
@@ -143,5 +148,65 @@ func TestServeHTTPRejectsInvalidBase64BeforeWriting(t *testing.T) {
 	}
 	if len(w.Header()) != 0 || w.Body.Len() != 0 {
 		t.Fatalf("response headers/body = %#v/%q, want no response data before write", w.Header(), w.Body.String())
+	}
+}
+
+func TestServeHTTPReturnsApplicationResponse(t *testing.T) {
+	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{
+		"type":"HTTPJSON-REP",
+		"meta":{"status":201,"headers":{"x-test":["one","two"]}},
+		"body":"AQI=",
+		"bodyEncoding":"base64"
+	}`)}}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
+	w := httptest.NewRecorder()
+
+	if err := m.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil), nil); err != nil {
+		t.Fatalf("ServeHTTP() error = %v", err)
+	}
+	if w.Code != http.StatusCreated || string(w.Body.Bytes()) != "\x01\x02" {
+		t.Fatalf("response = %d/%v, want 201/[1 2]", w.Code, w.Body.Bytes())
+	}
+	if got := w.Header().Values("X-Test"); len(got) != 2 || got[0] != "one" || got[1] != "two" {
+		t.Errorf("X-Test = %#v, want [one two]", got)
+	}
+}
+
+func TestServeHTTPReturnsApplicationErrorStatus(t *testing.T) {
+	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{
+		"type":"HTTPJSON-REP",
+		"meta":{"status":503},
+		"body":"unavailable"
+	}`)}}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
+	w := httptest.NewRecorder()
+
+	if err := m.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil), nil); err != nil {
+		t.Fatalf("ServeHTTP() error = %v, want nil for application error", err)
+	}
+	if w.Code != http.StatusServiceUnavailable || w.Body.String() != "unavailable" {
+		t.Fatalf("response = %d/%q, want 503/unavailable", w.Code, w.Body.String())
+	}
+}
+
+func TestInvokeLambdaReturnsTimeout(t *testing.T) {
+	fake := &fakeLambdaInvoker{invoke: func(ctx context.Context, _ *lambda.InvokeInput) (*lambda.InvokeOutput, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Millisecond, log: zap.NewNop(), svc: fake}
+
+	if _, err := m.invokeLambda(context.Background(), struct{}{}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("invokeLambda() error = %v, want deadline exceeded", err)
+	}
+}
+
+func TestInvokeLambdaReturnsThrottlingError(t *testing.T) {
+	wantErr := errors.New("throttled")
+	fake := &fakeLambdaInvoker{err: wantErr}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
+
+	if _, err := m.invokeLambda(context.Background(), struct{}{}); !errors.Is(err, wantErr) {
+		t.Fatalf("invokeLambda() error = %v, want throttling error", err)
 	}
 }

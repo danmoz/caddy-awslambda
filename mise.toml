@@ -5,7 +5,8 @@ ruff = "0.16.6"
 
 [tasks.test]
 description = "Run the Go test suite"
-run = "go test ./..."
+usage = 'flag "--race" help="Run tests with the race detector"'
+run = 'go test {% if usage.race %}-race {% endif %}./...'
 
 [tasks.sam-lambda]
 description = "Start the local SAM Lambda Invoke API"
@@ -57,6 +58,10 @@ go vet ./...
 [tasks.vet]
 description = "Run Go vet"
 run = "go vet ./..."
+
+[tasks.vuln]
+description = "Scan dependencies for known vulnerabilities"
+run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
 
 [tasks.check]
 description = "Run formatting, vet, and tests"

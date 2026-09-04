@@ -63,3 +63,16 @@ func TestUnmarshalCaddyfileAllowsMatcher(t *testing.T) {
 		t.Errorf("FunctionName = %q, want %q", m.FunctionName, "test-function")
 	}
 }
+
+func TestUnmarshalCaddyfileRejectsDuplicateEventFormat(t *testing.T) {
+	m := &LambdaMiddleware{}
+	err := m.UnmarshalCaddyfile(caddyfile.NewTestDispenser(`
+		awslambda {
+			event_format httpjson
+			event_format api_gateway_v2
+		}
+	`))
+	if err == nil {
+		t.Fatal("UnmarshalCaddyfile() error = nil, want duplicate directive error")
+	}
+}

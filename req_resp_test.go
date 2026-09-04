@@ -92,6 +92,48 @@ func TestParseReplyRejectsInvalidAPIGatewayV2Status(t *testing.T) {
 	}
 }
 
+func TestParseReplyHTTPJSON(t *testing.T) {
+	reply, err := parseReply([]byte(`{"type":"HTTPJSON-REP","meta":{"status":201,"headers":{"x-test":["one","two"]}},"body":"created"}`), eventFormatHTTPJSON)
+	if err != nil {
+		t.Fatalf("parseReply() error = %v", err)
+	}
+	if reply.Meta.Status != http.StatusCreated || reply.Body != "created" {
+		t.Fatalf("reply = %#v, want status 201 and created body", reply)
+	}
+	if got := reply.Meta.Headers["x-test"]; len(got) != 2 || got[0] != "one" || got[1] != "two" {
+		t.Errorf("headers = %#v, want [one two]", got)
+	}
+}
+
+func TestParseReplyAPIGatewayV2(t *testing.T) {
+	reply, err := parseReply([]byte(`{"statusCode":202,"headers":{"content-type":"text/plain"},"cookies":["one=1","two=2"],"body":"AQI=","isBase64Encoded":true}`), eventFormatAPIGatewayV2)
+	if err != nil {
+		t.Fatalf("parseReply() error = %v", err)
+	}
+	if reply.Meta.Status != http.StatusAccepted || reply.Body != "AQI=" || reply.BodyEncoding != "base64" {
+		t.Fatalf("reply = %#v, want API Gateway response fields", reply)
+	}
+	if got := reply.Meta.Headers["set-cookie"]; len(got) != 2 || got[0] != "one=1" || got[1] != "two=2" {
+		t.Errorf("cookies = %#v, want [one=1 two=2]", got)
+	}
+}
+
+func TestParseReplyRejectsMalformedAPIGatewayV2JSON(t *testing.T) {
+	if _, err := parseReply([]byte(`{"statusCode":`), eventFormatAPIGatewayV2); err == nil {
+		t.Fatal("parseReply() error = nil, want malformed JSON error")
+	}
+}
+
+func TestParseReplyTreatsMalformedHTTPJSONAsBody(t *testing.T) {
+	reply, err := parseReply([]byte(`{"type":`), eventFormatHTTPJSON)
+	if err != nil {
+		t.Fatalf("parseReply() error = %v", err)
+	}
+	if reply.Body != `{"type":` || reply.Meta.Status != http.StatusOK {
+		t.Fatalf("reply = %#v, want malformed input as 200 body", reply)
+	}
+}
+
 func TestValidateReplyRejectsInvalidHTTPJSONResponse(t *testing.T) {
 	reply := &Reply{Type: "HTTPJSON-REP", Meta: &ReplyMeta{Status: 700}}
 	if err := validateReply(reply); err == nil || !strings.Contains(err.Error(), "invalid status 700") {
