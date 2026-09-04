@@ -1,0 +1,54 @@
+[tools]
+aws-sam = { version = "latest", symlink_bins = "true" }
+go = "1.26.6"
+ruff = "0.16.6"
+
+[tasks.test]
+description = "Run the Go test suite"
+run = "go test ./..."
+
+[tasks.sam-lambda]
+description = "Start the local SAM Lambda Invoke API"
+run = "sam local start-lambda --template testdata/template.yaml --host 127.0.0.1 --port ${SAM_PORT:-3001}"
+
+[tasks.e2e]
+description = "Build the SAM fixture and run E2E tests"
+run = [
+  "sam build --template-file testdata/template.yaml",
+  "go test ./test/e2e -count=1",
+]
+
+[tasks.format]
+description = "Format Go and Python code"
+run = [
+  "gofmt -w $(find . -name '*.go' -type f -print)",
+  "ruff format testdata/lambda",
+]
+
+[tasks.lint]
+description = "Lint Go and Python code"
+usage = 'flag "--check" help="Fail instead of formatting code"'
+run = '''
+go_files=$(find . -name '*.go' -type f -print)
+{% if usage.check %}
+  test -z "$(gofmt -l $go_files)"
+  ruff format --check testdata/lambda
+{% else %}
+  gofmt -w $go_files
+  ruff format testdata/lambda
+{% endif %}
+ruff check testdata/lambda
+go vet ./...
+'''
+
+[tasks.vet]
+description = "Run Go vet"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Run formatting, vet, and tests"
+depends = ["lint", "test"]
+
+[tasks.fmt-check]
+description = "Verify Go formatting"
+run = "test -z \"$(gofmt -l .)\""

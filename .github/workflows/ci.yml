@@ -13,11 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v7
-        with:
-          go-version: 1.26.6
-          cache: true
-      - run: go test ./...
+      - uses: jdx/mise-action@v4
+      - run: mise test
 
   e2e:
     name: E2E tests
@@ -25,12 +22,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v7
-        with:
-          go-version: 1.26.6
-          cache: true
-      - uses: aws-actions/setup-sam@v3
-        with:
-          use-installer: true
-      - run: sam build --template-file testdata/template.yaml
-      - run: go test ./test/e2e -count=1
+      - uses: jdx/mise-action@v4
+      - run: mise lint --check
+      - run: mise e2e

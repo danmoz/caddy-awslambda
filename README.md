@@ -61,6 +61,15 @@ The initial API Gateway v2 adapter maps Caddy's request path directly to
 errors, timeouts, throttling, and malformed responses are returned as Caddy
 handler errors and are not silently converted to successful responses.
 
+## Development
+
+You can lint and format code with mise commands:
+
+```
+mise format
+mise lint
+```
+
 ## License
 
 Apache 2
