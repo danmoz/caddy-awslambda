@@ -35,6 +35,9 @@ func parseReply(data []byte, format string) (*Reply, error) {
 		if response.StatusCode == 0 {
 			return nil, fmt.Errorf("API Gateway v2 response is missing statusCode")
 		}
+		if response.StatusCode < 100 || response.StatusCode > 599 {
+			return nil, fmt.Errorf("API Gateway v2 response has invalid statusCode %d", response.StatusCode)
+		}
 		headers := make(map[string][]string, len(response.Headers))
 		for key, value := range response.Headers {
 			headers[key] = []string{value}
@@ -66,6 +69,22 @@ func parseReply(data []byte, format string) (*Reply, error) {
 		Meta: defaultReplyMeta(),
 		Body: string(data),
 	}, nil
+}
+
+func validateReply(reply *Reply) error {
+	if reply == nil {
+		return fmt.Errorf("response is empty")
+	}
+	if reply.Meta == nil {
+		return fmt.Errorf("response is missing metadata")
+	}
+	if reply.Meta.Status != 0 && (reply.Meta.Status < 100 || reply.Meta.Status > 599) {
+		return fmt.Errorf("response has invalid status %d", reply.Meta.Status)
+	}
+	if reply.BodyEncoding != "" && reply.BodyEncoding != "base64" {
+		return fmt.Errorf("response has unsupported body encoding %q", reply.BodyEncoding)
+	}
+	return nil
 }
 
 func boolEncoding(encoded bool) string {

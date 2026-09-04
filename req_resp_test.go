@@ -85,6 +85,33 @@ func TestNewRequestForFormatRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestParseReplyRejectsInvalidAPIGatewayV2Status(t *testing.T) {
+	_, err := parseReply([]byte(`{"statusCode": 700}`), eventFormatAPIGatewayV2)
+	if err == nil || !strings.Contains(err.Error(), "invalid statusCode 700") {
+		t.Fatalf("parseReply() error = %v, want invalid status error", err)
+	}
+}
+
+func TestValidateReplyRejectsInvalidHTTPJSONResponse(t *testing.T) {
+	reply := &Reply{Type: "HTTPJSON-REP", Meta: &ReplyMeta{Status: 700}}
+	if err := validateReply(reply); err == nil || !strings.Contains(err.Error(), "invalid status 700") {
+		t.Fatalf("validateReply() error = %v, want invalid status error", err)
+	}
+}
+
+func TestValidateReplyRejectsUnknownBodyEncoding(t *testing.T) {
+	reply := &Reply{Meta: &ReplyMeta{}, BodyEncoding: "base64url"}
+	if err := validateReply(reply); err == nil || !strings.Contains(err.Error(), "unsupported body encoding") {
+		t.Fatalf("validateReply() error = %v, want encoding error", err)
+	}
+}
+
+func TestValidateReplyRejectsMissingMetadata(t *testing.T) {
+	if err := validateReply(&Reply{}); err == nil || !strings.Contains(err.Error(), "missing metadata") {
+		t.Fatalf("validateReply() error = %v, want missing metadata error", err)
+	}
+}
+
 func TestReadRequestBodyDoesNotCloseBody(t *testing.T) {
 	body := &trackingBody{Reader: strings.NewReader("body")}
 	r := httptest.NewRequest(http.MethodPost, "/", body)

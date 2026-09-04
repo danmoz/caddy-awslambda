@@ -133,6 +133,20 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 	if err != nil {
 		return err
 	}
+	if err := validateReply(reply); err != nil {
+		return err
+	}
+
+	// Optionally decode the response body before writing any response data.
+	var bodyBytes []byte
+	if reply.BodyEncoding == "base64" && reply.Body != "" {
+		bodyBytes, err = base64.StdEncoding.DecodeString(reply.Body)
+		if err != nil {
+			return err
+		}
+	} else {
+		bodyBytes = []byte(reply.Body)
+	}
 
 	// Write the response HTTP headers
 	for k, vals := range reply.Meta.Headers {
@@ -150,17 +164,6 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 	}
 
 	w.WriteHeader(reply.Meta.Status)
-
-	// Optionally decode the response body
-	var bodyBytes []byte
-	if reply.BodyEncoding == "base64" && reply.Body != "" {
-		bodyBytes, err = base64.StdEncoding.DecodeString(reply.Body)
-		if err != nil {
-			return err
-		}
-	} else {
-		bodyBytes = []byte(reply.Body)
-	}
 
 	// Write the response body
 	_, err = w.Write(bodyBytes)
