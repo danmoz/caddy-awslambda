@@ -1,0 +1,13 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: FastAPI and Mangum fixture for caddy-awslambda tests
+
+Resources:
+  Lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.12
+      CodeUri: lambda/
+      Handler: app.handler
+      Timeout: 10
+      MemorySize: 256
