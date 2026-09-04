@@ -36,6 +36,10 @@ standard Lambda endpoint. For local SAM testing, set it to the address used by
 and `session_token` can provide local-only credentials for SAM. When these
 settings are omitted, the AWS SDK default credential chain is used.
 
+Lambda invocation uses Caddy's IAM identity; end-user authentication and
+authorization remain the application's responsibility, with request headers
+such as `Authorization` forwarded unchanged.
+
 ## IAM permissions
 
 Caddy invokes Lambda with SigV4 using its workload IAM role. Grant that role
