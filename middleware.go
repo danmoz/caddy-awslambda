@@ -31,6 +31,7 @@ func init() {
 type LambdaMiddleware struct {
 	FunctionName string `json:"function,omitempty"`
 	Endpoint     string `json:"endpoint,omitempty"`
+	EventFormat  string `json:"event_format,omitempty"`
 	Timeout      string `json:"timeout,omitempty"`
 
 	timeout time.Duration
@@ -83,7 +84,7 @@ func (m *LambdaMiddleware) Validate() error {
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ caddyhttp.Handler) error {
-	req, err := newRequest(r)
+	req, err := newRequestForFormat(r, m.eventFormat())
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 	return nil
 }
 
-func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req *Request) ([]byte, error) {
+func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req any) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 
@@ -168,6 +169,13 @@ func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req *Request) ([]by
 
 	log.Info("")
 	return resp.Payload, nil
+}
+
+func (m *LambdaMiddleware) eventFormat() string {
+	if m.EventFormat == "" {
+		return eventFormatHTTPJSON
+	}
+	return m.EventFormat
 }
 
 // Cleanup implements caddy.Cleanup.
