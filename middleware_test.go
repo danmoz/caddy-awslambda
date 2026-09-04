@@ -3,6 +3,8 @@ package caddyawslambda
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -102,5 +104,24 @@ func TestValidate(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %q", err, test.wantErrorText)
 			}
 		})
+	}
+}
+
+func TestServeHTTPRejectsInvalidBase64BeforeWriting(t *testing.T) {
+	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{
+		"type":"HTTPJSON-REP",
+		"meta":{"status":200},
+		"body":"not-base64",
+		"bodyEncoding":"base64"
+	}`)}}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
+	w := httptest.NewRecorder()
+
+	err := m.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil), nil)
+	if err == nil {
+		t.Fatal("ServeHTTP() error = nil, want base64 decoding error")
+	}
+	if len(w.Header()) != 0 || w.Body.Len() != 0 {
+		t.Fatalf("response headers/body = %#v/%q, want no response data before write", w.Header(), w.Body.String())
 	}
 }
