@@ -51,10 +51,21 @@ func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				m.Endpoint = d.Val()
 			case "timeout":
+				if m.Timeout != "" {
+					return d.Err("timeout already specified")
+				}
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
 				m.Timeout = d.Val()
+			case "event_format":
+				if m.EventFormat != "" {
+					return d.Err("event_format already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.EventFormat = d.Val()
 			default:
 				return d.Errf("unrecognized subdirective: %s", d.Val())
 			}

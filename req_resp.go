@@ -24,7 +24,30 @@ const (
 // a string other than 'HTTPJSON-REP', then data will be set as the Reply.body
 // and Reply.meta will contain a default struct with a 200 status and
 // a content-type header of 'application/json'.
-func parseReply(data []byte) (*Reply, error) {
+func parseReply(data []byte, format string) (*Reply, error) {
+	if format == eventFormatAPIGatewayV2 {
+		var response APIGatewayV2Response
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("decode API Gateway v2 response: %w", err)
+		}
+		if response.StatusCode == 0 {
+			return nil, fmt.Errorf("API Gateway v2 response is missing statusCode")
+		}
+		headers := make(map[string][]string, len(response.Headers))
+		for key, value := range response.Headers {
+			headers[key] = []string{value}
+		}
+		if len(response.Cookies) > 0 {
+			headers["set-cookie"] = append(headers["set-cookie"], response.Cookies...)
+		}
+		return &Reply{
+			Type:         "HTTPJSON-REP",
+			Meta:         &ReplyMeta{Status: response.StatusCode, Headers: headers},
+			Body:         response.Body,
+			BodyEncoding: boolEncoding(response.IsBase64Encoded),
+		}, nil
+	}
+
 	if len(data) > 0 && data[0] == '{' {
 		var rep Reply
 		err := json.Unmarshal(data, &rep)
@@ -41,6 +64,13 @@ func parseReply(data []byte) (*Reply, error) {
 		Meta: defaultReplyMeta(),
 		Body: string(data),
 	}, nil
+}
+
+func boolEncoding(encoded bool) string {
+	if encoded {
+		return "base64"
+	}
+	return ""
 }
 
 func newRequestForFormat(r *http.Request, format string) (any, error) {
@@ -168,6 +198,15 @@ type APIGatewayV2Request struct {
 	RequestContext        APIGatewayV2RequestContext `json:"requestContext"`
 	Body                  string                     `json:"body,omitempty"`
 	IsBase64Encoded       bool                       `json:"isBase64Encoded"`
+}
+
+// APIGatewayV2Response is the response format emitted by Mangum.
+type APIGatewayV2Response struct {
+	StatusCode      int               `json:"statusCode"`
+	Headers         map[string]string `json:"headers"`
+	Cookies         []string          `json:"cookies"`
+	Body            string            `json:"body"`
+	IsBase64Encoded bool              `json:"isBase64Encoded"`
 }
 
 type APIGatewayV2RequestContext struct {

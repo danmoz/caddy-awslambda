@@ -96,7 +96,7 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 	}
 
 	// Unpack the reply JSON
-	reply, err := parseReply(resp)
+	reply, err := parseReply(resp, m.eventFormat())
 	if err != nil {
 		return err
 	}
