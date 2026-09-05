@@ -15,8 +15,8 @@ zip_file=.build/lambda.zip
 rm -rf "$build_dir" "$zip_file"
 mkdir -p "$build_dir"
 python -m pip install --disable-pip-version-check --no-compile \
-  --requirement ../testdata/lambda/requirements.txt --target "$build_dir"
-cp ../testdata/lambda/app.py "$build_dir/"
+  --requirement ../testapp/lambda/requirements.txt --target "$build_dir"
+cp ../testapp/lambda/app.py "$build_dir/"
 (cd "$build_dir" && zip -q -r ../lambda.zip .)
 '''
 

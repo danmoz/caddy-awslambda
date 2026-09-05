@@ -10,12 +10,12 @@ run = 'go test {% if usage.race %}-race {% endif %}./...'
 
 [tasks.sam-lambda]
 description = "Start the local SAM Lambda Invoke API"
-run = "sam local start-lambda --template testdata/template.yaml --host 127.0.0.1 --port ${SAM_PORT:-3001}"
+run = "sam local start-lambda --template testapp/template.yaml --host 127.0.0.1 --port ${SAM_PORT:-3001}"
 
 [tasks.e2e]
 description = "Build the SAM fixture and run E2E tests"
 run = [
-  "sam build --template-file testdata/template.yaml",
+  "sam build --template-file testapp/template.yaml",
   "go test ./test/e2e -count=1",
 ]
 
@@ -27,10 +27,10 @@ go_files=$(find . -name '*.go' -type f -print)
 
 {% if usage.check %}
 test -z "$(gofmt -l $go_files)"
-ruff format --diff testdata/lambda
+ruff format --diff testapp/lambda
 {% else %}
   gofmt -w $go_files
-  ruff format testdata/lambda
+  ruff format testapp/lambda
 {% endif %}
 '''
 
@@ -47,9 +47,9 @@ go_files=$(find . -name '*.go' -type f -print)
 {% endif %}
 
 {% if usage.check %}
-  ruff check testdata/lambda
+  ruff check testapp/lambda
 {% else %}
-  ruff check --fix testdata/lambda
+  ruff check --fix testapp/lambda
 {% endif %}
 
 go vet ./...
