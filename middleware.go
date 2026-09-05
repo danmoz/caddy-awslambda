@@ -38,6 +38,7 @@ func init() {
 // LambdaMiddleware implements an HTTP handler that invokes a Lambda function.
 type LambdaMiddleware struct {
 	FunctionName    string `json:"function,omitempty"`
+	Qualifier       string `json:"qualifier,omitempty"`
 	Endpoint        string `json:"endpoint,omitempty"`
 	Region          string `json:"region,omitempty"`
 	AccessKeyID     string `json:"access_key_id,omitempty"`
@@ -226,10 +227,15 @@ func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req any, requestID 
 		return nil, fmt.Errorf("marshal Lambda request for %q: %w", m.FunctionName, err)
 	}
 
-	resp, err := m.svc.Invoke(ctx, &lambda.InvokeInput{
+	input := &lambda.InvokeInput{
 		FunctionName: &m.FunctionName,
 		Payload:      payload,
-	})
+	}
+	if m.Qualifier != "" {
+		input.Qualifier = aws.String(m.Qualifier)
+	}
+
+	resp, err := m.svc.Invoke(ctx, input)
 
 	if err != nil {
 		return nil, fmt.Errorf("invoke Lambda %q: %w", m.FunctionName, err)

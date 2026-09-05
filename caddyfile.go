@@ -26,6 +26,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //
 //	awslambda [<matcher>] {
 //	    function <function name>
+//	    qualifier <version or alias>
 //	    endpoint <url>
 //	    region <region>
 //	    access_key_id <access key id>
@@ -49,6 +50,14 @@ func (m *LambdaMiddleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.FunctionName = d.Val()
+			case "qualifier":
+				if m.Qualifier != "" {
+					return d.Err("qualifier already specified")
+				}
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				m.Qualifier = d.Val()
 			case "endpoint":
 				if m.Endpoint != "" {
 					return d.Err("endpoint already specified")

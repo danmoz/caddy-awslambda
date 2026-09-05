@@ -34,6 +34,7 @@ func TestInvokeLambdaUsesConfiguredFunctionAndPayload(t *testing.T) {
 	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{"ok":true}`)}}
 	m := &LambdaMiddleware{
 		FunctionName: "test-function",
+		Qualifier:    "prod",
 		timeout:      time.Second,
 		log:          zap.NewNop(),
 		svc:          fake,
@@ -48,6 +49,9 @@ func TestInvokeLambdaUsesConfiguredFunctionAndPayload(t *testing.T) {
 	}
 	if got := *fake.input.FunctionName; got != "test-function" {
 		t.Errorf("function name = %q, want %q", got, "test-function")
+	}
+	if got := *fake.input.Qualifier; got != "prod" {
+		t.Errorf("qualifier = %q, want %q", got, "prod")
 	}
 	var request Request
 	if err := json.Unmarshal(fake.input.Payload, &request); err != nil {
@@ -86,6 +90,7 @@ func TestInvokeLambdaLogsSafeDebugFields(t *testing.T) {
 	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{}`)}}
 	m := &LambdaMiddleware{
 		FunctionName: "test-function",
+		Qualifier:    "prod",
 		timeout:      time.Second,
 		log:          zap.New(core),
 		svc:          fake,

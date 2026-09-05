@@ -13,28 +13,74 @@ xcaddy build \
 
 ## Usage
 
-```
-{
-  order awslambda before file_server
-}
+### Minimal configuration
 
-http://localhost:8080 {
+The only required setting is the Lambda function name. The AWS SDK uses its
+default credential and region resolution, the `httpjson` event format, and the
+default timeout and body-size limit.
+
+```caddyfile
+:8080 {
+  handle /services/* {
+    awslambda {
+      function ForwardToSlack
+    }
+  }
+}
+```
+
+### Full configuration
+
+```caddyfile
+:8080 {
   log {
     output stderr
   }
-  awslambda /services/* {
-    function ForwardToSlack
-    # endpoint http://127.0.0.1:3001
+  handle /services/* {
+    awslambda {
+      function ForwardToSlack
+      qualifier prod
+      event_format api_gateway_v2
+      timeout 10s
+      max_body_size 1048576
+      region us-east-1
+
+      # Key based auth
+      access_key_id local-access-key
+      secret_access_key local-secret-key
+      session_token local-session-token
+
+      # OR Role based auth
+      # role_arn arn:aws:iam::123456789012:role/LambdaInvoker
+      # external_id example-external-id
+      # session_name caddy-awslambda
+
+      # Useful for local testing:
+      # endpoint http://127.0.0.1:3001
+    }
   }
 }
 ```
 
-The `endpoint` setting is optional. When omitted, the AWS SDK resolves the
-standard Lambda endpoint. For local SAM testing, set it to the address used by
-`sam local start-lambda`, for example `http://127.0.0.1:3001`.
-`region` overrides the AWS region, and `access_key_id`, `secret_access_key`,
-and `session_token` can provide local-only credentials for SAM. When these
-settings are omitted, the AWS SDK default credential chain is used.
+| Setting             | Description                                      | Default                  |
+| ------------------- | ------------------------------------------------ | ------------------------ |
+| `function`          | Lambda function name or ARN to invoke.           | (required)               |
+| `qualifier`         | Lambda version number or alias to invoke.        | Unqualified function     |
+| `event_format`      | Lambda request and response contract.            | `httpjson`               |
+| `timeout`           | Maximum duration of a synchronous invocation.    | `10s`                    |
+| `max_body_size`     | Maximum request body size in bytes.              | `0` (unlimited)          |
+| `region`            | AWS region used for the Lambda client.           | AWS SDK resolution       |
+| `access_key_id`     | Optional static access key for local testing.    | AWS SDK credential chain |
+| `secret_access_key` | Static secret key paired with `access_key_id`.   | AWS SDK credential chain |
+| `session_token`     | Optional token for static temporary credentials. | Not set                  |
+| `role_arn`          | IAM role to assume before invoking Lambda.       | No role assumption       |
+| `external_id`       | External ID passed to STS `AssumeRole`.          | Not set                  |
+| `session_name`      | Role session name passed to STS `AssumeRole`.    | AWS SDK default          |
+| `endpoint`          | Lambda API endpoint.                             | AWS SDK endpoint         |
+
+When the credential settings are omitted, the AWS SDK default credential chain
+is used. `role_arn`, `external_id`, and `session_name` configure optional STS
+role assumption as described below.
 
 Lambda invocation uses Caddy's IAM identity; end-user authentication and
 authorization remain the application's responsibility, with request headers

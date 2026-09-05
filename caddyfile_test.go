@@ -11,6 +11,7 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 	if err := m.UnmarshalCaddyfile(caddyfile.NewTestDispenser(`
 		awslambda {
 			function test-function
+			qualifier prod
 			endpoint http://127.0.0.1:3001
 			region us-east-1
 			access_key_id test
@@ -28,6 +29,9 @@ func TestUnmarshalCaddyfileEndpoint(t *testing.T) {
 
 	if m.FunctionName != "test-function" {
 		t.Errorf("FunctionName = %q, want %q", m.FunctionName, "test-function")
+	}
+	if m.Qualifier != "prod" {
+		t.Errorf("Qualifier = %q, want %q", m.Qualifier, "prod")
 	}
 	if m.Endpoint != "http://127.0.0.1:3001" {
 		t.Errorf("Endpoint = %q, want %q", m.Endpoint, "http://127.0.0.1:3001")
@@ -74,5 +78,18 @@ func TestUnmarshalCaddyfileRejectsDuplicateEventFormat(t *testing.T) {
 	`))
 	if err == nil {
 		t.Fatal("UnmarshalCaddyfile() error = nil, want duplicate directive error")
+	}
+}
+
+func TestUnmarshalCaddyfileRejectsDuplicateQualifier(t *testing.T) {
+	m := &LambdaMiddleware{}
+	err := m.UnmarshalCaddyfile(caddyfile.NewTestDispenser(`
+		awslambda {
+			qualifier prod
+			qualifier staging
+		}
+	`))
+	if err == nil {
+		t.Fatal("UnmarshalCaddyfile() error = nil, want duplicate qualifier error")
 	}
 }
