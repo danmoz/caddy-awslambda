@@ -80,7 +80,7 @@ The `event_format` setting selects both the request event and response format.
 | Value            | Status    | Contract                                             |
 | ---              | ---       | ---                                                  |
 | `httpjson`       | Default   | `HTTPJSON-REQ` and `HTTPJSON-REP` envelopes.         |
-| `api_gateway_v2` | Planned   | API Gateway HTTP API payload version 2.0 for Mangum. |
+| `api_gateway_v2` | Available | API Gateway HTTP API payload version 2.0 for Mangum. |
 | `api_gateway_v1` | Planned   | API Gateway REST/proxy payload version 1.0.          |
 | `alb`            | Planned   | Application Load Balancer Lambda event.              |
 | `function_url`   | Planned   | Lambda Function URL event.                           |
@@ -100,6 +100,18 @@ The initial API Gateway v2 adapter maps Caddy's request path directly to
 `rawPath`; it does not trim a base path. AWS invocation errors, Lambda function
 errors, timeouts, throttling, and malformed responses are returned as Caddy
 handler errors and are not silently converted to successful responses.
+
+### Logging
+
+HTTP access logging remains Caddy's responsibility. This module does not log
+credentials, headers, or request/response bodies.
+
+At `DEBUG` level, every attempted Lambda invocation emits the function name,
+invocation duration, and an incoming `X-Request-ID` when present. Failed
+invocations also include the contextual error. At `INFO`, `WARN`, and `ERROR`
+levels, the module does not emit a separate per-invocation record. Invocation
+failures are returned as contextual handler errors for Caddy to log and convert
+into an HTTP error response through its normal error handling configuration.
 
 ## Development
 

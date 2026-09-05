@@ -6,11 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type fakeLambdaInvoker struct {
@@ -37,7 +39,7 @@ func TestInvokeLambdaUsesConfiguredFunctionAndPayload(t *testing.T) {
 		svc:          fake,
 	}
 
-	payload, err := m.invokeLambda(context.Background(), Request{Type: "HTTPJSON-REQ"})
+	payload, err := m.invokeLambda(context.Background(), Request{Type: "HTTPJSON-REQ"}, "")
 	if err != nil {
 		t.Fatalf("invokeLambda() error = %v", err)
 	}
@@ -58,14 +60,51 @@ func TestInvokeLambdaUsesConfiguredFunctionAndPayload(t *testing.T) {
 
 func TestInvokeLambdaReturnsFunctionError(t *testing.T) {
 	functionError := "Unhandled"
+	core, logs := observer.New(zap.DebugLevel)
 	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{
 		FunctionError: &functionError,
 		Payload:       []byte("boom"),
 	}}
-	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
+	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.New(core), svc: fake}
 
-	if _, err := m.invokeLambda(context.Background(), struct{}{}); err == nil {
+	if _, err := m.invokeLambda(context.Background(), struct{}{}, ""); err == nil {
 		t.Fatal("invokeLambda() error = nil, want function error")
+	} else if strings.Contains(err.Error(), "boom") {
+		t.Fatalf("invokeLambda() error = %v, must not include function payload", err)
+	}
+	entries := logs.All()
+	if len(entries) != 1 {
+		t.Fatalf("log entries = %d, want 1", len(entries))
+	}
+	if got := entries[0].ContextMap()["error"]; got == nil || !strings.Contains(got.(string), "Unhandled") {
+		t.Fatalf("logged error = %#v, want Unhandled", got)
+	}
+}
+
+func TestInvokeLambdaLogsSafeDebugFields(t *testing.T) {
+	core, logs := observer.New(zap.DebugLevel)
+	fake := &fakeLambdaInvoker{output: &lambda.InvokeOutput{Payload: []byte(`{}`)}}
+	m := &LambdaMiddleware{
+		FunctionName: "test-function",
+		timeout:      time.Second,
+		log:          zap.New(core),
+		svc:          fake,
+	}
+
+	if _, err := m.invokeLambda(context.Background(), struct{}{}, "request-123"); err != nil {
+		t.Fatalf("invokeLambda() error = %v", err)
+	}
+
+	entries := logs.All()
+	if len(entries) != 1 {
+		t.Fatalf("log entries = %d, want 1", len(entries))
+	}
+	fields := entries[0].ContextMap()
+	if fields["function"] != "test-function" || fields["request_id"] != "request-123" {
+		t.Fatalf("log fields = %#v, want function and request_id", fields)
+	}
+	if _, ok := fields["duration"]; !ok {
+		t.Fatal("log fields missing duration")
 	}
 }
 
@@ -196,7 +235,7 @@ func TestInvokeLambdaReturnsTimeout(t *testing.T) {
 	}}
 	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Millisecond, log: zap.NewNop(), svc: fake}
 
-	if _, err := m.invokeLambda(context.Background(), struct{}{}); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := m.invokeLambda(context.Background(), struct{}{}, ""); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("invokeLambda() error = %v, want deadline exceeded", err)
 	}
 }
@@ -206,7 +245,7 @@ func TestInvokeLambdaReturnsThrottlingError(t *testing.T) {
 	fake := &fakeLambdaInvoker{err: wantErr}
 	m := &LambdaMiddleware{FunctionName: "test-function", timeout: time.Second, log: zap.NewNop(), svc: fake}
 
-	if _, err := m.invokeLambda(context.Background(), struct{}{}); !errors.Is(err, wantErr) {
+	if _, err := m.invokeLambda(context.Background(), struct{}{}, ""); !errors.Is(err, wantErr) {
 		t.Fatalf("invokeLambda() error = %v, want throttling error", err)
 	}
 }

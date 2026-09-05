@@ -151,7 +151,7 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 		return err
 	}
 
-	resp, err := m.invokeLambda(r.Context(), req)
+	resp, err := m.invokeLambda(r.Context(), req, r.Header.Get("X-Request-ID"))
 
 	if err != nil {
 		return err
@@ -203,36 +203,42 @@ func (m *LambdaMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ c
 	return nil
 }
 
-func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req any) ([]byte, error) {
+func (m *LambdaMiddleware) invokeLambda(ctx context.Context, req any, requestID string) (payload []byte, err error) {
 	ctx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
+	fields := []zap.Field{zap.String("function", m.FunctionName)}
+	if requestID != "" {
+		fields = append(fields, zap.String("request_id", requestID))
 	}
-
-	log := m.log.With(zap.Any("function", []string{m.FunctionName}))
+	log := m.log.With(fields...)
 	startTime := time.Now()
+	defer func() {
+		logFields := []zap.Field{zap.Duration("duration", time.Since(startTime))}
+		if err != nil {
+			logFields = append(logFields, zap.Error(err))
+		}
+		log.Debug("Lambda invocation complete", logFields...)
+	}()
+
+	payload, err = json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal Lambda request for %q: %w", m.FunctionName, err)
+	}
 
 	resp, err := m.svc.Invoke(ctx, &lambda.InvokeInput{
 		FunctionName: &m.FunctionName,
 		Payload:      payload,
 	})
 
-	log = log.With(zap.Duration("duration", time.Since(startTime))).Named("exit")
 	if err != nil {
-		log.Error("", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("invoke Lambda %q: %w", m.FunctionName, err)
 	}
 
 	if resp.FunctionError != nil {
-		err = fmt.Errorf("function error: %s: %w", *resp.FunctionError, errors.New(string(resp.Payload)))
-		log.Error("", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("Lambda function %q returned %s", m.FunctionName, *resp.FunctionError)
 	}
 
-	log.Info("")
 	return resp.Payload, nil
 }
 
