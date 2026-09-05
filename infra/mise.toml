@@ -1,0 +1,58 @@
+[tools]
+awscli = "latest"
+opentofu = "1.12.6"
+python = "3.12"
+
+[env]
+AWS_REGION = "us-east-1"
+
+[tasks.aws-package]
+description = "Package the test Lambda for AWS"
+run = '''
+set -eu
+build_dir=.build/lambda
+zip_file=.build/lambda.zip
+rm -rf "$build_dir" "$zip_file"
+mkdir -p "$build_dir"
+python -m pip install --disable-pip-version-check --no-compile \
+  --requirement ../testdata/lambda/requirements.txt --target "$build_dir"
+cp ../testdata/lambda/app.py "$build_dir/"
+(cd "$build_dir" && zip -q -r ../lambda.zip .)
+'''
+
+[tasks.aws-deploy]
+description = "Set up the Caddy container and Lambda for manual testing"
+usage = 'flag "--plan-only" help="Only preview changes"'
+depends = ["aws-package"]
+run = '''
+tofu init
+{% if usage.plan_only %}
+tofu plan
+{% else %}
+test -n "$(command -v docker)" || { echo "docker is required for deployment" >&2; exit 1; }
+tofu apply -target=aws_ecr_repository.caddy -auto-approve
+repository=$(tofu output -raw ecr_repository_url)
+registry=${repository%%/*}
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$registry"
+docker build --platform linux/amd64 --file Dockerfile --tag "$repository:latest" ..
+docker push "$repository:latest"
+tofu apply
+cluster=$(tofu output -raw ecs_cluster)
+service=$(tofu output -raw ecs_service)
+aws ecs wait services-stable --cluster "$cluster" --services "$service"
+task=$(aws ecs list-tasks --cluster "$cluster" --service-name "$service" \
+  --desired-status RUNNING --query 'taskArns[0]' --output text)
+eni=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" \
+  --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' --output text)
+ip=$(aws ec2 describe-network-interfaces --network-interface-ids "$eni" \
+  --query 'NetworkInterfaces[0].Association.PublicIp' --output text)
+printf '\nCaddy is ready. Your Lambda is available through Caddy at:\n\n  http://%s\n\nTry it with:\n\n  curl http://%s/health\n  curl "http://%s/echo?tag=one&tag=two"\n\n' "$ip" "$ip" "$ip"
+{% endif %}
+'''
+
+[tasks.aws-destroy]
+description = "Destroy the Caddy container and Lambda"
+run = [
+  "tofu init",
+  "tofu destroy",
+]

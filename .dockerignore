@@ -1,0 +1,6 @@
+.git
+.aws-sam
+infra/.build
+infra/.terraform
+infra/*.tfstate
+infra/*.tfstate.*
